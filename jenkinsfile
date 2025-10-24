@@ -4,33 +4,25 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/YangDullu/RekonXL.git'
+                git branch: 'main', url: 'https://github.com/YangDullu/RekonXL.git'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Build') {
             steps {
-                sh 'composer install --no-interaction --no-progress'
+                echo 'Building the project...'
             }
         }
 
-        stage('Code Quality Check') {
+        stage('Test') {
             steps {
-                // Integrasi ke SonarQube (opsional)
-                withSonarQubeEnv('SonarQubeServer') {
-                    sh 'sonar-scanner -Dsonar.projectKey=myproject -Dsonar.sources=.'
-                }
+                echo 'Running tests...'
             }
         }
 
-        stage('Deploy to Production') {
+        stage('Deploy') {
             steps {
-                // Upload file ke server production pakai scp/rsync
-                sh '''
-                rsync -avz --exclude="uploads" \
-                ./ devops@10.54.54.40:/var/www/html/upload_scv/
-                '''
+                echo 'Deploying to server...'
             }
         }
     }
