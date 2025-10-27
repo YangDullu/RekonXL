@@ -63,7 +63,7 @@ pipeline {
                             --exclude '.git/' \
                             ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/
                     """
-                echo "✅ Deployment finished at $(date)"
+                echo "✅ Deployment finished at \$(date)"
                 }
             }
         }
