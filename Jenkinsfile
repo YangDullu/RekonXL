@@ -44,102 +44,67 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
-            steps {
-                echo '🚀 Deploying only changed files to production server...'
-                sshagent (credentials: ['jenkins-ssh-key']) {
-                    sh '''
-                        # === Get list of changed files ===
-                        CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-                        echo "Changed files: $CHANGED_FILES"
-                        
-                        # === Backup dan deploy hanya file yang berubah ===
-                        if [ -n "$CHANGED_FILES" ]; then
-                            # Create backup directory on remote
-                            ssh -o StrictHostKeyChecking=no ''' + "${DEPLOY_USER}@${DEPLOY_HOST}" + ''' "mkdir -p ''' + "${BACKUP_PATH}" + '''/rekonxl_''' + "${TIMESTAMP}" + '''"
+stage('Deploy') {
+    steps {
+        echo '🚀 Deploying only changed files to production server...'
+        sshagent (credentials: ['jenkins-ssh-key']) {
+            sh """
+                # Get changed files
+                CHANGED_FILES=\\$(git diff --name-only HEAD~1 HEAD)
+                echo "Changed files: \\$CHANGED_FILES"
+                
+                if [ -n "\\$CHANGED_FILES" ]; then
+                    # Create backup directory
+                    ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "mkdir -p ${BACKUP_PATH}/rekonxl_${TIMESTAMP}"
+                    
+                    # Process each file
+                    echo "\\$CHANGED_FILES" | while read file; do
+                        if [ -n "\\$file" ] && [ -f "\\$file" ]; then
+                            echo "Processing: \\$file"
                             
-                            # Process each changed file
-                            echo "$CHANGED_FILES" | while read file; do
-                                if [ -n "$file" ] && [ -f "$file" ]; then
-                                    echo "🔄 Processing: $file"
-                                    
-                                    # Backup existing file on remote - FIXED QUOTING
-                                    ssh -o StrictHostKeyChecking=no ''' + "${DEPLOY_USER}@${DEPLOY_HOST}" + ''' ' "
-                                        if [ -f ''' + "${DEPLOY_PATH}" + '''/'"'"'$file'"'"' ]; then
-                                            echo \"📦 Backing up: '"'"'$file'"'"'\"
-                                            mkdir -p $(dirname \"''' + "${BACKUP_PATH}" + '''/rekonxl_''' + "${TIMESTAMP}" + '''/'"'"'$file'"'"'\" )
-                                            cp ''' + "${DEPLOY_PATH}" + '''/'"'"'$file'"'"' \"''' + "${BACKUP_PATH}" + '''/rekonxl_''' + "${TIMESTAMP}" + '''/'"'"'$file'"'''\" 
-                                        fi
-                                    " '
-                                    
-                                    # Deploy only the changed file
-                                    rsync -avz \
-                                        --no-perms --no-owner --no-group \
-                                        -e "ssh -o StrictHostKeyChecking=no" \
-                                        "$file" ''' + "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}" + '''/"$file"
+                            # Backup file
+                            ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} "
+                                if [ -f ${DEPLOY_PATH}/\\$file ]; then
+                                    echo \\\\"Backing up: \\$file\\\\"
+                                    mkdir -p \\\\$(dirname \\\\"${BACKUP_PATH}/rekonxl_${TIMESTAMP}/\\$file\\\\")
+                                    cp ${DEPLOY_PATH}/\\$file \\\\"${BACKUP_PATH}/rekonxl_${TIMESTAMP}/\\$file\\\\"
                                 fi
-                            done
+                            "
                             
-                            # === Permission adjustment untuk file yang di-deploy ===
-                            ssh -o StrictHostKeyChecking=no ''' + "${DEPLOY_USER}@${DEPLOY_HOST}" + ''' '
-                                echo "🧩 Checking and adjusting permissions for changed files..."
-                                
-                                # Deteksi user web server
-                                if id apache >/dev/null 2>&1; then
-                                    WEBUSER="apache"
-                                elif id nginx >/dev/null 2>&1; then
-                                    WEBUSER="nginx"
-                                elif id www-data >/dev/null 2>&1; then
-                                    WEBUSER="www-data"
-                                elif id root >/dev/null 2>&1; then
-                                    WEBUSER="root"
-                                else
-                                    WEBUSER=""
-                                fi
-                                
-                                if [ ! -z "$WEBUSER" ]; then
-                                    echo "🔧 Applying permissions for user: $WEBUSER"
-                                    
-                                    # Apply permission hanya untuk file dan directory yang di-deploy
-                                    CHANGED_FILES_LIST="'"$CHANGED_FILES"'"
-                                    for file in $CHANGED_FILES_LIST; do
-                                        if [ -f ''' + "${DEPLOY_PATH}" + '''/$file ]; then
-                                            sudo chown $WEBUSER:$WEBUSER ''' + "${DEPLOY_PATH}" + '''/$file
-                                            
-                                            # Permission berbeda berdasarkan user
-                                            if [ "$WEBUSER" = "root" ]; then
-                                                sudo chmod 600 ''' + "${DEPLOY_PATH}" + '''/$file
-                                                echo "🔐 Applied root permissions (600) for: $file"
-                                            else
-                                                sudo chmod 644 ''' + "${DEPLOY_PATH}" + '''/$file
-                                                echo "✅ Applied web permissions (644) for: $file"
-                                            fi
-                                            
-                                            # Juga set permission untuk parent directory
-                                            DIR=$(dirname ''' + "${DEPLOY_PATH}" + '''/$file)
-                                            sudo chown $WEBUSER:$WEBUSER "$DIR"
-                                            
-                                            if [ "$WEBUSER" = "root" ]; then
-                                                sudo chmod 700 "$DIR"
-                                                echo "🔐 Applied root directory permissions (700) for: $DIR"
-                                            else
-                                                sudo chmod 755 "$DIR"
-                                                echo "✅ Applied web directory permissions (755) for: $DIR"
-                                            fi
-                                        fi
-                                    done
-                                else
-                                    echo "⚠️ No web user detected, skipping permission adjustment."
-                                fi
-                            '
-                        else
-                            echo "ℹ️ No files changed, skipping deployment."
+                            # Deploy file
+                            rsync -avz \\
+                                --no-perms --no-owner --no-group \\
+                                -e "ssh -o StrictHostKeyChecking=no" \\
+                                "\\$file" ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"\\$file"
                         fi
-
-                        echo "✅ Incremental deployment finished at $(date)"
-                    '''
-                }
-            }
+                    done
+                    
+                    # Set permissions
+                    ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
+                        # Detect web user
+                        if id apache >/dev/null 2>&1; then
+                            WEBUSER="apache"
+                        elif id nginx >/dev/null 2>&1; then
+                            WEBUSER="nginx"
+                        elif id www-data >/dev/null 2>&1; then
+                            WEBUSER="www-data" 
+                        elif id root >/dev/null 2>&1; then
+                            WEBUSER="root"
+                        else
+                            WEBUSER=""
+                        fi
+                        
+                        if [ ! -z "\\$WEBUSER" ]; then
+                            echo "Setting permissions for: \\$WEBUSER"
+                            sudo find ${DEPLOY_PATH} -type f -exec chmod 644 {} \\;
+                            sudo find ${DEPLOY_PATH} -type d -exec chmod 755 {} \\;
+                            sudo chown -R \\$WEBUSER:\\$WEBUSER ${DEPLOY_PATH}
+                        fi
+                    '
+                fi
+            """
         }
+    }
+}
     }
 }
