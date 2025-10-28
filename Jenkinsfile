@@ -59,6 +59,7 @@ stage('Deploy') {
                 '
 
                 rsync -avz \
+                    --rsync-path="sudo rsync" \
                     --no-perms --no-owner --no-group \
                     --ignore-errors --stats \
                     -e "ssh -o StrictHostKeyChecking=no" \
