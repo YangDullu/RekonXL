@@ -152,7 +152,7 @@
 
 <div class="left">
   <img src="jatelindo_logo.png" alt="Jatelindo" class="logo">
-  <div class="tagline">--PSB Reconciliation JUNED BABI--</div>
+  <div class="tagline">--PSB Reconciliation--</div>
 </div>
 
 <div class="right">
