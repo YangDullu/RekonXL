@@ -83,8 +83,8 @@ stage('Deploy') {
                             echo "🔧 Fixing ownership to \$WEBUSER"
                             sudo chown -R \$WEBUSER:\$WEBUSER ${DEPLOY_PATH}
                         fi
-                        sudo find ${DEPLOY_PATH} -type d -exec chmod 777 {} \\;
-                        sudo find ${DEPLOY_PATH} -type f -exec chmod 755 {} \\;
+                        sudo find ${DEPLOY_PATH} -type d -exec chmod 755 {} \\;
+                        sudo find ${DEPLOY_PATH} -type f -exec chmod 644 {} \\;
                     else
                         echo "⚠️ No web user detected, skipping permission fix."
                     fi
