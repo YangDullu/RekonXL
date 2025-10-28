@@ -52,7 +52,7 @@ stage('Deploy') {
                 ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
                     mkdir -p ${BACKUP_PATH}
                     if [ -d ${DEPLOY_PATH} ]; then
-                        BACKUP_DIR="${BACKUP_PATH}/rekonxl_${TIMESTAMP}"
+                        BACKUP_DIR="${BACKUP_PATH}/BackUP_${TIMESTAMP}"
                         echo "📦 Backing up current project to \$BACKUP_DIR"
                         cp -r ${DEPLOY_PATH} \$BACKUP_DIR
                     fi
