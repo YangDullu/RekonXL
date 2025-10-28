@@ -1,7 +1,7 @@
 
 <?php
 session_start();
-$conn = new mysqli("localhost", "root", "", "xl_jpa");
+$conn = new mysqli("localhost", "root", "Sud4hm4nd1?", "xl_jpa");
 if ($conn->connect_error) {
     die("? DB error: " . $conn->connect_error);
 }

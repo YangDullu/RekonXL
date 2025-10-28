@@ -3,7 +3,7 @@
 
         $host = 'localhost';
         $user = 'root'; // Ganti jika beda
-        $pass = '';     // Ganti jika ada password
+        $pass = 'Sud4hm4nd1?';     // Ganti jika ada password
         $db   = 'xl_jpa';
 
         $conn = new mysqli($host, $user, $pass, $db);

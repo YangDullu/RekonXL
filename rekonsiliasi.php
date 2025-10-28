@@ -12,7 +12,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 $host = 'localhost';
 $db = 'xl_jpa';
 $user = 'root';
-$pass = '';
+$pass = 'Sud4hm4nd1?';
 
 $conn = new mysqli($host, $user, $pass, $db);
 if ($conn->connect_error) {
