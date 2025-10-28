@@ -46,10 +46,9 @@ pipeline {
 
 stage('Deploy') {
     steps {
-        echo '🚀 Deploying to production server (with smart permission handling)...'
+        echo '🚀 Deploying to production server (with safe backup & permission check)...'
         sshagent (credentials: ['jenkins-ssh-key']) {
             sh """
-                # === Backup project lama ===
                 ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
                     mkdir -p ${BACKUP_PATH}
                     if [ -d ${DEPLOY_PATH} ]; then
@@ -59,37 +58,34 @@ stage('Deploy') {
                     fi
                 '
 
-                # === Rsync upload project baru (tanpa ubah permission lama) ===
                 rsync -avz \
                     --no-perms --no-owner --no-group \
+                    --ignore-errors --stats \
                     -e "ssh -o StrictHostKeyChecking=no" \
-                    --exclude 'uploads/*' \
+                    --exclude '/uploads/**' \
                     --exclude '.git/' \
                     ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/
 
-                # === (Opsional) Penyesuaian permission otomatis ===
                 ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
-                    echo "🧩 Checking and adjusting permissions if needed..."
-
-                    # Deteksi user yang dipakai untuk service web
+                    echo "🧩 Adjusting permissions if needed..."
                     if id apache >/dev/null 2>&1; then
                         WEBUSER="apache"
                     elif id nginx >/dev/null 2>&1; then
                         WEBUSER="nginx"
                     elif id root >/dev/null 2>&1; then
                         WEBUSER="root"
-                    else
-                        WEBUSER=""
                     fi
 
                     if [ ! -z "\$WEBUSER" ]; then
-                        echo "🔧 Applying chown/chmod for user: \$WEBUSER"
-                        sudo chown -R \$WEBUSER:\$WEBUSER ${DEPLOY_PATH}
+                        CURRENT_OWNER=\$(stat -c "%U" ${DEPLOY_PATH})
+                        if [ "\$CURRENT_OWNER" != "\$WEBUSER" ]; then
+                            echo "🔧 Fixing ownership to \$WEBUSER"
+                            sudo chown -R \$WEBUSER:\$WEBUSER ${DEPLOY_PATH}
+                        fi
                         sudo find ${DEPLOY_PATH} -type d -exec chmod 755 {} \\;
                         sudo find ${DEPLOY_PATH} -type f -exec chmod 644 {} \\;
-                        echo "✅ Permissions adjusted for \$WEBUSER"
                     else
-                        echo "⚠️ No web user detected, skipping permission adjustment."
+                        echo "⚠️ No web user detected, skipping permission fix."
                     fi
                 '
 
