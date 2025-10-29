@@ -10,6 +10,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/YangDullu/RekonXL.git'
@@ -44,57 +45,81 @@ pipeline {
             }
         }
 
-stage('Deploy') {
-    steps {
-        echo '🚀 Deploying to production server (with safe backup & permission check)...'
-        sshagent (credentials: ['jenkins-ssh-key']) {
-            sh """
-                ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
-                    mkdir -p ${BACKUP_PATH}
-                    if [ -d ${DEPLOY_PATH} ]; then
-                        BACKUP_DIR="${BACKUP_PATH}/BackUP_${TIMESTAMP}"
-                        echo "📦 Backing up current project to \$BACKUP_DIR"
-                        cp -r ${DEPLOY_PATH} \$BACKUP_DIR
-                    fi
-                '
-
-                rsync -avz \
-                    --rsync-path="sudo rsync" \
-                    --no-perms --no-owner --no-group \
-                    --ignore-errors --stats \
-                    -e "ssh -o StrictHostKeyChecking=no" \
-                    --exclude '/uploads/**' \
-                    --exclude '.git/' \
-                    ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/
-
-                ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
-                    echo "🧩 Adjusting permissions if needed..."
-                    if id apache >/dev/null 2>&1; then
-                        WEBUSER="apache"
-                    elif id nginx >/dev/null 2>&1; then
-                        WEBUSER="nginx"
-                    elif id root >/dev/null 2>&1; then
-                        WEBUSER="root"
-                    fi
-
-                    if [ ! -z "\$WEBUSER" ]; then
-                        CURRENT_OWNER=\$(stat -c "%U" ${DEPLOY_PATH})
-                        if [ "\$CURRENT_OWNER" != "\$WEBUSER" ]; then
-                            echo "🔧 Fixing ownership to \$WEBUSER"
-                            sudo chown -R \$WEBUSER:\$WEBUSER ${DEPLOY_PATH}
-                        fi
-                        sudo find ${DEPLOY_PATH} -type d -exec chmod 755 {} \\;
-                        sudo find ${DEPLOY_PATH} -type f -exec chmod 644 {} \\;
+        // 🔧 Tambahan stage build (khusus Laravel/Zend, dll)
+        stage('Build') {
+            steps {
+                echo '📦 Installing dependencies (if applicable)...'
+                sh '''
+                    if [ -f composer.json ]; then
+                        echo "Composer project detected — installing dependencies..."
+                        composer install --no-dev --optimize-autoloader
                     else
-                        echo "⚠️ No web user detected, skipping permission fix."
+                        echo "No composer.json found — skipping composer install."
                     fi
-                '
-
-                echo "✅ Deployment finished at \$(date)"
-            """
+                '''
+            }
         }
-    }
-}
 
+        stage('Deploy') {
+            steps {
+                echo '🚀 Deploying to production server (with safe backup & permission check)...'
+                sshagent (credentials: ['jenkins-ssh-key']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
+                            mkdir -p ${BACKUP_PATH}
+                            if [ -d ${DEPLOY_PATH} ]; then
+                                BACKUP_DIR="${BACKUP_PATH}/BackUP_${TIMESTAMP}"
+                                echo "📦 Backing up current project to \$BACKUP_DIR"
+                                cp -r ${DEPLOY_PATH} \$BACKUP_DIR
+                            fi
+                        '
+
+                        rsync -avz \
+                            --rsync-path="sudo rsync" \
+                            --no-perms --no-owner --no-group \
+                            --ignore-errors --stats \
+                            -e "ssh -o StrictHostKeyChecking=no" \
+                            --exclude '/uploads/**' \
+                            --exclude '.git/' \
+                            ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/
+
+                        ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
+                            echo "🧩 Adjusting permissions if needed..."
+                            if id apache >/dev/null 2>&1; then
+                                WEBUSER="apache"
+                            elif id nginx >/dev/null 2>&1; then
+                                WEBUSER="nginx"
+                            elif id root >/dev/null 2>&1; then
+                                WEBUSER="root"
+                            fi
+
+                            if [ ! -z "\$WEBUSER" ]; then
+                                CURRENT_OWNER=\$(stat -c "%U" ${DEPLOY_PATH})
+                                if [ "\$CURRENT_OWNER" != "\$WEBUSER" ]; then
+                                    echo "🔧 Fixing ownership to \$WEBUSER"
+                                    sudo chown -R \$WEBUSER:\$WEBUSER ${DEPLOY_PATH}
+                                fi
+                                sudo find ${DEPLOY_PATH} -type d -exec chmod 755 {} \\;
+                                sudo find ${DEPLOY_PATH} -type f -exec chmod 644 {} \\;
+                            else
+                                echo "⚠️ No web user detected, skipping permission fix."
+                            fi
+
+                            # === Post-deploy commands khusus framework ===
+                            if [ -f ${DEPLOY_PATH}/artisan ]; then
+                                echo "🚀 Laravel project detected — running artisan commands..."
+                                cd ${DEPLOY_PATH}
+                                php artisan config:cache || true
+                                php artisan route:cache || true
+                                php artisan view:cache || true
+                                php artisan migrate --force || true
+                            fi
+                        '
+
+                        echo "✅ Deployment finished at \$(date)"
+                    """
+                }
+            }
+        }
     }
 }
