@@ -79,7 +79,7 @@ pipeline {
                             --no-perms --no-owner --no-group \
                             --ignore-errors --stats \
                             -e "ssh -o StrictHostKeyChecking=no" \
-                            --exclude '/uploads/**' \
+                            --exclude 'uploads/**' \
                             --exclude '.git/' \
                             ./ ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/
 
