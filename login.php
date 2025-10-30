@@ -152,7 +152,7 @@
 
 <div class="left">
   <img src="jatelindo_logo.png" alt="Jatelindo" class="logo">
-  <div class="tagline">--PSB Reconciliation TEST--</div>
+  <div class="tagline">--PSB Reconciliation Test--</div>
 </div>
 
 <div class="right">
